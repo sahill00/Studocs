@@ -10,7 +10,7 @@ function SecureViewerContent() {
 
   useEffect(() => {
     // Aggressively block Ctrl+P and Ctrl+S
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === 'p' || e.key === 's' || e.key === 'P' || e.key === 'S') {
           e.preventDefault();
@@ -22,7 +22,7 @@ function SecureViewerContent() {
     };
 
     // Block right click
-    const handleContextMenu = (e) => {
+    const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
     };
 
@@ -68,3 +68,4 @@ export default function SecureViewer() {
     </Suspense>
   );
 }
+
