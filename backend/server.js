@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1); // Trust Railway Proxy
 const port = process.env.PORT || 5000;
 
 // Import Routes
@@ -75,4 +76,5 @@ app.get('/api/health', (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
 
