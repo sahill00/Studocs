@@ -10,19 +10,19 @@ function SecureViewerContent() {
 
   useEffect(() => {
     // Aggressively block Ctrl+P and Ctrl+S
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e) => {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === 'p' || e.key === 's' || e.key === 'P' || e.key === 'S') {
           e.preventDefault();
           e.stopPropagation();
-          alert("Downloading and printing are disabled for this document.");
+          alert('Downloading and printing are disabled for this document.');
           return false;
         }
       }
     };
 
     // Block right click
-    const handleContextMenu = (e: MouseEvent) => {
+    const handleContextMenu = (e) => {
       e.preventDefault();
     };
 
@@ -40,22 +40,18 @@ function SecureViewerContent() {
   return (
     <div className={styles.container}>
       {/* Global CSS block to disable printing completely */}
-      <style dangerouslySetInnerHTML={{__html: \
-        @media print {
-          body { display: none !important; }
-        }
-      \}} />
+      <style dangerouslySetInnerHTML={{__html: '@media print { body { display: none !important; } }'}} />
       
       <nav className={styles.navbar}>
         <button onClick={() => window.close()} className={styles.closeBtn}>
-          +? CLOSE VIEWER
+          CLOSE VIEWER
         </button>
       </nav>
 
       {/* Embed the PDF securely without a toolbar */}
       <div className={styles.viewerWrapper}>
         <iframe 
-          src={\\#toolbar=0&navpanes=0&scrollbar=0\} 
+          src={fileUrl + '#toolbar=0&navpanes=0&scrollbar=0'} 
           className={styles.iframe}
           title="Secure Document Viewer"
         />
