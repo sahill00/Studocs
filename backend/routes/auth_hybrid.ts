@@ -115,8 +115,13 @@ router.get('/verify-email', async (req: Request, res: Response) => {
       await db.query('UPDATE users SET is_email_verified = true, last_login_at = NOW() WHERE id = $1', [userId]);
     }
 
-    const userRoleRes = await db.query('SELECT role FROM users WHERE id = $1', [userId]);
+    const userRoleRes = await db.query('SELECT role, full_name FROM users WHERE id = $1', [userId]);
     const userRole = userRoleRes.rows.length > 0 ? userRoleRes.rows[0].role : 'student';
+    const fullName = userRoleRes.rows.length > 0 ? userRoleRes.rows[0].full_name : null;
+    
+    // If they don't have a name set, they need to complete their profile setup
+    const needsSetup = isNewUser || !fullName;
+
     // Generate Session JWT
     const sessionToken = jwt.sign({ userId, role: userRole }, JWT_SECRET, { expiresIn: '7d' });
 
@@ -124,8 +129,8 @@ router.get('/verify-email', async (req: Request, res: Response) => {
       success: true,
       user_id: userId,
       auth_token: sessionToken,
-      is_new_user: isNewUser,
-      redirect_to: isNewUser ? '/profile/setup' : '/browse'
+      is_new_user: needsSetup,
+      redirect_to: needsSetup ? '/profile/setup' : '/browse'
     });
   } catch (error) {
     console.error('Verify error:', error);
