@@ -1,0 +1,167 @@
+.adminContainer {
+  display: flex;
+  min-height: 100vh;
+  background-color: #121212;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #1a1a1a;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarBrand {
+  padding: 2rem;
+  border-bottom: 1px solid #333;
+}
+
+.sidebarBrand h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: 2px;
+  font-weight: 300;
+  color: #ffd700;
+}
+
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  flex-grow: 1;
+  gap: 0.5rem;
+}
+
+.navLink {
+  color: #ccc;
+  text-decoration: none;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.navLink:hover {
+  background-color: #333;
+  color: #fff;
+}
+
+.mainContent {
+  flex-grow: 1;
+  padding: 3rem;
+  overflow-y: auto;
+}
+
+.pageTitle {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.statCard {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.statCard h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  color: #aaa;
+}
+
+.statCard p {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.table th, .table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #333;
+}
+
+.table th {
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.btnAction {
+  background: transparent;
+  border: 1px solid #fff;
+  color: #fff;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.btnAction:hover {
+  background: #333;
+}
+
+.btnDanger {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+.btnDanger:hover {
+  background: #ff4444;
+  color: #fff;
+}
+
+.statusTag {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  background: #333;
+}
+
+.status_pending { background: #ff9800; color: #fff; }
+.status_resolved { background: #4caf50; color: #fff; }
+.status_reviewing { background: #2196f3; color: #fff; }
+.status_rejected { background: #f44336; color: #fff; }
+
+.modalOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modalActions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  justify-content: flex-end;
+}
