@@ -1,3 +1,5 @@
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 ﻿import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
