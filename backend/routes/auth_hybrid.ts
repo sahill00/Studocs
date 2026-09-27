@@ -1,11 +1,11 @@
-const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
-﻿import express, { Request, Response } from 'express';
+import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import db from '../db'; // Assuming db.js is still used and handles the pool
-import nodemailer from 'nodemailer';
+import db from '../db';
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -33,7 +33,6 @@ router.post('/send-magic-link', async (req: Request, res: Response) => {
       [token, userId, email, expiresAt]
     );
 
-    // Send email using Nodemailer
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const magicLink = `${frontendUrl}/auth/verify?token=${token}`;
     
@@ -50,16 +49,16 @@ router.post('/send-magic-link', async (req: Request, res: Response) => {
             <p style="margin-top: 20px; font-size: 12px; color: #666;">This link expires in 15 minutes.</p>
           </div>`
         });
-        if (error) console.error("Resend error:", error);
+
+        if (error) {
+          console.error("Resend error:", error);
+        }
         console.log(`[REAL EMAIL SENT TO ${email}] via Resend`);
       } catch (emailErr) {
         console.error('Error sending with Resend:', emailErr);
       }
     } else {
       console.log(`\n\n[MOCK EMAIL SENT TO ${email}]\nMagic Link URL: ${magicLink}\n(Configure RESEND_API_KEY in .env to send real emails)\n\n`);
-    }
-
-    \n(Configure EMAIL_USER and EMAIL_PASS in .env to send real emails)\n\n`);
     }
 
     res.json({
@@ -256,6 +255,3 @@ router.post('/login-password', async (req: Request, res: Response) => {
 });
 
 export default router;
-
-
-
