@@ -43,15 +43,15 @@ router.post('/send-magic-link', async (req: Request, res: Response) => {
           from: 'Studocs <onboarding@resend.dev>',
           to: [email],
           subject: 'Your StuDocs Login Link',
-          html: <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+          html: `<div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
             <h2>Welcome to StuDocs!</h2>
             <p>Click the button below to log into your account securely.</p>
-            <a href="" style="display: inline-block; padding: 10px 20px; background-color: #000; color: #fff; text-decoration: none; border-radius: 5px; margin-top: 15px;">Login to StuDocs</a>
+            <a href="${magicLink}" style="display: inline-block; padding: 10px 20px; background-color: #000; color: #fff; text-decoration: none; border-radius: 5px; margin-top: 15px;">Login to StuDocs</a>
             <p style="margin-top: 20px; font-size: 12px; color: #666;">This link expires in 15 minutes.</p>
-          </div>
+          </div>`
         });
         if (error) console.error("Resend error:", error);
-        console.log([REAL EMAIL SENT TO ] via Resend);
+        console.log(`[REAL EMAIL SENT TO ${email}] via Resend`);
       } catch (emailErr) {
         console.error('Error sending with Resend:', emailErr);
       }
