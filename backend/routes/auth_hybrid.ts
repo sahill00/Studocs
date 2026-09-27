@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+﻿import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
@@ -258,3 +258,4 @@ router.post('/login-password', async (req: Request, res: Response) => {
 });
 
 export default router;
+
