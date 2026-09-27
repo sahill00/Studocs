@@ -37,7 +37,10 @@ router.post('/send-magic-link', async (req: Request, res: Response) => {
     
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.EMAIL_USER !== 'your-email@gmail.com') {
       const transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        family: 4,
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASS
@@ -258,4 +261,5 @@ router.post('/login-password', async (req: Request, res: Response) => {
 });
 
 export default router;
+
 
