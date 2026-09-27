@@ -187,4 +187,21 @@ router.patch('/notes/:id/status', async (req, res) => {
   }
 });
 
+
+// Get all notes (including hidden ones) for Admin Dashboard
+router.get('/notes', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT n.*, u.full_name as uploader_name 
+       FROM notes n 
+       JOIN users u ON n.uploader_id = u.id 
+       ORDER BY n.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching admin notes:', err);
+    res.status(500).json({ error: 'Failed to fetch notes.' });
+  }
+});
+
 module.exports = router;

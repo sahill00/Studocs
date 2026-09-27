@@ -16,7 +16,7 @@ export default function AdminNotes() {
     if (!token) return;
 
     try {
-      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + `/api/notes?limit=100`, {
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + `/api/admin/notes`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
