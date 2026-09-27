@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import styles from './page.module.css';
 
-export default function SecureViewer() {
+function SecureViewerContent() {
   const searchParams = useSearchParams();
   const fileUrl = searchParams.get('url');
 
@@ -40,27 +40,35 @@ export default function SecureViewer() {
   return (
     <div className={styles.container}>
       {/* Global CSS block to disable printing completely */}
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{__html: \
         @media print {
           body { display: none !important; }
         }
-      `}} />
+      \}} />
       
       <nav className={styles.navbar}>
         <button onClick={() => window.close()} className={styles.closeBtn}>
-          ← CLOSE VIEWER
+          +? CLOSE VIEWER
         </button>
       </nav>
 
       {/* Embed the PDF securely without a toolbar */}
       <div className={styles.viewerWrapper}>
         <iframe 
-          src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`} 
+          src={\\#toolbar=0&navpanes=0&scrollbar=0\} 
           className={styles.iframe}
           title="Secure Document Viewer"
         />
         <div className={styles.overlay}></div>
       </div>
     </div>
+  );
+}
+
+export default function SecureViewer() {
+  return (
+    <Suspense fallback={<div className={styles.container}>Loading secure viewer...</div>}>
+      <SecureViewerContent />
+    </Suspense>
   );
 }
