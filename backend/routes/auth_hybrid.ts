@@ -37,37 +37,35 @@ router.post('/send-magic-link', async (req: Request, res: Response) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const magicLink = `${frontendUrl}/auth/verify?token=${token}`;
     
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.EMAIL_USER !== 'your-email@gmail.com') {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        requireTLS: true,
-        family: 4,
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        }
-      });
-
-      const mailOptions = {
-        from: `"StuDocs" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: 'Your StuDocs Login Link',
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const { data, error } = await resend.emails.send({
+          from: 'Studocs <onboarding@resend.dev>',
+          to: [email],
+          subject: 'Your StuDocs Login Link',
+          html: <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
             <h2>Welcome to StuDocs!</h2>
             <p>Click the button below to log into your account securely.</p>
-            <a href="${magicLink}" style="display: inline-block; padding: 10px 20px; background-color: #000; color: #fff; text-decoration: none; border-radius: 5px; margin-top: 15px;">Login to StuDocs</a>
+            <a href="" style="display: inline-block; padding: 10px 20px; background-color: #000; color: #fff; text-decoration: none; border-radius: 5px; margin-top: 15px;">Login to StuDocs</a>
             <p style="margin-top: 20px; font-size: 12px; color: #666;">This link expires in 15 minutes.</p>
           </div>
-        `
-      };
-
-      await transporter.sendMail(mailOptions);
-      console.log(`[REAL EMAIL SENT TO ${email}]`);
+        });
+        if (error) console.error("Resend error:", error);
+        console.log([REAL EMAIL SENT TO ] via Resend);
+      } catch (emailErr) {
+        console.error('Error sending with Resend:', emailErr);
+      }
     } else {
-      console.log(`\n\n[MOCK EMAIL SENT TO ${email}]\nMagic Link URL: ${magicLink}\n(Configure EMAIL_USER and EMAIL_PASS in .env to send real emails)\n\n`);
+      console.log(
+
+[MOCK EMAIL SENT TO ]
+Magic Link URL: 
+(Configure RESEND_API_KEY in .env to send real emails)
+
+);
+    }
+
+    \n(Configure EMAIL_USER and EMAIL_PASS in .env to send real emails)\n\n`);
     }
 
     res.json({
