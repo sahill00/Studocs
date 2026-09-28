@@ -1,11 +1,12 @@
-import express, { Request, Response } from 'express';
+import express, { type Request, type Response } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import db from '../db';
+import db from '../db.js';
 import { Resend } from 'resend';
+import { OAuth2Client } from 'google-auth-library';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_123');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -259,7 +260,6 @@ router.post('/login-password', async (req: Request, res: Response) => {
   }
 });
 
-const { OAuth2Client } = require('google-auth-library');
 const googleClient = new OAuth2Client(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
 
 router.post('/google', async (req: Request, res: Response) => {
