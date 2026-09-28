@@ -201,9 +201,9 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     try {
       const result = await db.query(
         `INSERT INTO notes 
-         (title, description, note_type, difficulty_level, visibility, file_url, file_size_bytes, file_type, branch, academic_year, semester, exam_year, uploader_id, file_hash) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-        [title, description, note_type, difficulty_level, visibility, file_url, file_size_bytes, file_type, branch, academicYearVal, semesterVal, examYearVal, uploader_id, fileHash]
+         (title, description, note_type, difficulty_level, visibility, file_url, file_path, file_size_bytes, file_type, branch, academic_year, semester, exam_year, uploader_id, file_hash) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+        [title, description, note_type, difficulty_level, visibility, file_url, filePath, file_size_bytes, file_type, branch, academicYearVal, semesterVal, examYearVal, uploader_id, fileHash]
       );
       
       if (redisClient.isReady) {
@@ -239,7 +239,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const result = await db.query(
-      'UPDATE notes SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND uploader_id = $2 AND deleted_at IS NULL RETURNING id, file_url',
+      'UPDATE notes SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND uploader_id = $2 AND deleted_at IS NULL RETURNING id, file_url, file_path',
       [req.params.id, req.user.userId]
     );
     
@@ -248,12 +248,11 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 
     const note = result.rows[0];
-    if (note.file_url) {
+    const filePath = note.file_path || (note.file_url ? note.file_url.split('/notes/')[1] : null);
+    
+    if (filePath) {
       try {
-        const filePath = note.file_url.split('/notes/')[1];
-        if (filePath) {
-          await supabase.storage.from('notes').remove([filePath]);
-        }
+        await supabase.storage.from('notes').remove([filePath]);
       } catch (err) {
         console.error('Failed to delete file from Supabase:', err);
       }
@@ -383,16 +382,26 @@ router.get('/:id', optionalAuth, async (req, res) => {
 router.post('/:id/upvote', authenticateToken, async (req, res) => {
   try {
     const result = await db.query(
-      'UPDATE notes SET upvotes = COALESCE(upvotes, 0) + 1 WHERE id = $1 RETURNING upvotes, uploader_id, title',
-      [req.params.id]
+      'INSERT INTO upvotes (user_id, note_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id',
+      [req.user.userId, req.params.id]
     );
-    if (result.rows.length === 0) {
+    
+    // Always calculate total upvotes from the upvotes table
+    const countRes = await db.query('SELECT COUNT(*) as count FROM upvotes WHERE note_id = $1', [req.params.id]);
+    const upvotes = parseInt(countRes.rows[0].count, 10);
+    
+    // Optionally update the notes table cache if needed
+    await db.query('UPDATE notes SET upvotes = $1 WHERE id = $2', [upvotes, req.params.id]);
+
+    const noteRes = await db.query('SELECT title, uploader_id FROM notes WHERE id = $1', [req.params.id]);
+    
+    if (noteRes.rows.length === 0) {
       return res.status(404).json({ error: 'Note not found' });
     }
     
-    const { upvotes, uploader_id, title } = result.rows[0];
+    const { title, uploader_id } = noteRes.rows[0];
     
-    if (uploader_id && uploader_id !== req.user.userId) {
+    if (result.rows.length > 0 && uploader_id && uploader_id !== req.user.userId) {
       const userRes = await db.query('SELECT full_name FROM users WHERE id = $1', [req.user.userId]);
       const upvoterName = userRes.rows.length > 0 ? userRes.rows[0].full_name || 'Someone' : 'Someone';
       
@@ -400,7 +409,11 @@ router.post('/:id/upvote', authenticateToken, async (req, res) => {
         `INSERT INTO notifications (user_id, actor_id, type, entity_id, message) 
          VALUES ($1, $2, $3, $4, $5)`,
         [uploader_id, req.user.userId, 'upvote', req.params.id, `${upvoterName} upvoted your note: "${title}"`]
-      );
+      ).catch(console.error);
+    }
+    
+    if (redisClient.isReady) {
+      await redisClient.flushDb().catch(console.error);
     }
     
     res.json({ success: true, upvotes });
