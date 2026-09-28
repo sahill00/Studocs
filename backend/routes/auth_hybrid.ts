@@ -259,4 +259,41 @@ router.post('/login-password', async (req: Request, res: Response) => {
   }
 });
 
+const { OAuth2Client } = require('google-auth-library');
+const googleClient = new OAuth2Client(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
+
+router.post('/google', async (req: Request, res: Response) => {
+  try {
+    const { credential } = req.body;
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    });
+    const payload = ticket.getPayload();
+    const { sub: google_id, email, name } = payload;
+
+    let result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    let user;
+
+    if (result.rows.length === 0) {
+      const insertResult = await db.query(
+        `INSERT INTO users (full_name, email, google_id) VALUES ($1, $2, $3) RETURNING id, full_name, email`,
+        [name, email, google_id]
+      );
+      user = insertResult.rows[0];
+    } else {
+      user = result.rows[0];
+      if (!user.google_id) {
+        await db.query('UPDATE users SET google_id = $1 WHERE email = $2', [google_id, email]);
+      }
+    }
+
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ user, token });
+  } catch (error) {
+    console.error('Google Auth error:', error);
+    res.status(500).json({ error: 'Server error during Google authentication' });
+  }
+});
+
 export default router;
