@@ -71,4 +71,54 @@ router.post('/login', async (req, res) => {
   }
 });
 
+const { OAuth2Client } = require('google-auth-library');
+const googleClient = new OAuth2Client(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
+
+// Google Sign-In
+router.post('/google', async (req, res) => {
+  try {
+    const { credential } = req.body;
+    
+    // Verify Google token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    });
+    
+    const payload = ticket.getPayload();
+    const { sub: google_id, email, name } = payload;
+    
+    // Check if user exists
+    let result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    let user;
+    
+    if (result.rows.length === 0) {
+      // Create new user if they don't exist
+      const insertResult = await db.query(
+        `INSERT INTO users (name, email, google_id) 
+         VALUES ($1, $2, $3) RETURNING id, name, email, branch`,
+        [name, email, google_id]
+      );
+      user = insertResult.rows[0];
+    } else {
+      user = result.rows[0];
+      // Update google_id if it's missing (linked account)
+      if (!user.google_id) {
+        await db.query('UPDATE users SET google_id = $1 WHERE email = $2', [google_id, email]);
+      }
+    }
+    
+    // Generate JWT
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    
+    // Remove password hash if present
+    if (user.password_hash) delete user.password_hash;
+    
+    res.json({ user, token });
+  } catch (error) {
+    console.error('Google Auth error:', error);
+    res.status(500).json({ error: 'Server error during Google authentication' });
+  }
+});
+
 module.exports = router;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import styles from './AuthModal.module.css';
 
 interface AuthModalProps {
@@ -71,8 +72,32 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    try {
+      setLoading(true);
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + '/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential })
+      });
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user_id', data.user.id.toString());
+        window.location.reload();
+      } else {
+        setError(data.error || 'Google login failed');
+      }
+    } catch (err) {
+      setError('Network error during Google login');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'dummy-client-id'}>
+      <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <button className={styles.closeBtn} onClick={onClose}>✕</button>
 
@@ -132,8 +157,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <span>OR</span>
             </div>
 
-            <button className={styles.oauthBtn}>Continue with Google</button>
-            <button className={styles.oauthBtn}>Continue with GitHub</button>
+            <div className={styles.oauthContainer} style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Google login failed')}
+                useOneTap
+              />
+            </div>
           </>
         ) : (
           <div className={styles.successState}>
@@ -149,6 +179,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </GoogleOAuthProvider>
   );
 }
