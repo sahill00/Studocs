@@ -10,7 +10,7 @@ app.set('trust proxy', 1); // Trust Railway Proxy
 const port = process.env.PORT || 5000;
 
 // Import Routes
-const authRoutes = require('./routes/auth_hybrid').default;
+const authRoutes = require('./routes/auth_hybrid.ts').default;
 const notesRoutes = require('./routes/notes');
 const collectionsRoutes = require('./routes/collections');
 const groupsRoutes = require('./routes/groups');
