@@ -45,7 +45,9 @@ const authenticateToken = (req, res, next) => {
 // Get all public notes (with filtering)
 router.get('/', async (req, res) => {
   try {
-    const { branch, academic_year, semester, note_type, search, limit = 20, offset = 0 } = req.query;
+    let { branch, academic_year, semester, note_type, search } = req.query;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 50);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
     
     // Check cache if there are no specific search filters
     const isCacheable = !branch && !academic_year && !semester && !note_type && !search;

@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
 
@@ -39,6 +40,7 @@ const corsOptions = {
   credentials: true
 };
 
+app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json());
 
