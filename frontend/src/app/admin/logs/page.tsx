@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import styles from '../admin.module.css';
 
 export default function AdminLogsPage() {
-  const [logs, setLogs] = useState([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
