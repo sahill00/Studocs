@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useDebounce } from 'use-debounce';
 import styles from './page.module.css';
 
 export default function BrowseNotes() {
@@ -18,6 +20,7 @@ export default function BrowseNotes() {
     note_type: '',
     search: ''
   });
+  const [debouncedFilters] = useDebounce(filters, 500);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Report Modal State
@@ -30,7 +33,9 @@ export default function BrowseNotes() {
     const token = localStorage.getItem('token');
     if (token) {
       try {
-        setCurrentUser(JSON.parse(atob(token.split('.')[1])));
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        setCurrentUser(JSON.parse(atob(base64)));
       } catch (e) {}
     }
   }, []);
@@ -38,7 +43,7 @@ export default function BrowseNotes() {
   useEffect(() => {
     fetchNotes();
     fetchBookmarks();
-  }, [filters, page]);
+  }, [debouncedFilters, page]);
 
   const fetchBookmarks = async () => {
     const token = localStorage.getItem('token');
@@ -59,10 +64,10 @@ export default function BrowseNotes() {
     try {
       // Build query string
       const params = new URLSearchParams();
-      if (filters.branch) params.append('branch', filters.branch);
-      if (filters.academic_year) params.append('academic_year', filters.academic_year);
-      if (filters.note_type) params.append('note_type', filters.note_type);
-      if (filters.search) params.append('search', filters.search);
+      if (debouncedFilters.branch) params.append('branch', debouncedFilters.branch);
+      if (debouncedFilters.academic_year) params.append('academic_year', debouncedFilters.academic_year);
+      if (debouncedFilters.note_type) params.append('note_type', debouncedFilters.note_type);
+      if (debouncedFilters.search) params.append('search', debouncedFilters.search);
 
       params.append('limit', limit.toString());
       params.append('offset', ((page - 1) * limit).toString());
@@ -226,20 +231,20 @@ export default function BrowseNotes() {
       {/* Top Navbar matching the style */}
       <nav className={styles.navbar}>
         <div className={styles.navLeft}>
-          <a href="/" className={styles.navLink}>← HOME</a>
+          <Link href="/" className={styles.navLink}>← HOME</Link>
         </div>
         <div className={styles.navCenter}>
-          <a href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
             <h1 className={styles.logo}>STUDOCS</h1>
-          </a>
+          </Link>
         </div>
         <div className={styles.navRight}>
           {currentUser?.role === 'admin' && (
-            <a href="/admin" className={styles.navLink} style={{ marginRight: '2rem', color: '#ffd700' }}>ADMIN</a>
+            <Link href="/admin" className={styles.navLink} style={{ marginRight: '2rem', color: '#ffd700' }}>ADMIN</Link>
           )}
-          <a href="/requests" className={styles.navLink} style={{ marginRight: '2rem' }}>REQUESTS</a>
-          <a href="/bookmarks" className={styles.navLink} style={{ marginRight: '2rem' }}>BOOKMARKS</a>
-          <a href="/upload" className={styles.navLink}>UPLOAD</a>
+          <Link href="/requests" className={styles.navLink} style={{ marginRight: '2rem' }}>REQUESTS</Link>
+          <Link href="/bookmarks" className={styles.navLink} style={{ marginRight: '2rem' }}>BOOKMARKS</Link>
+          <Link href="/upload" className={styles.navLink}>UPLOAD</Link>
         </div>
       </nav>
 

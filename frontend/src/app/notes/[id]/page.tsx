@@ -2,17 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import useSWR from 'swr';
 import styles from './page.module.css';
+
+const fetcher = (url: string) => {
+  const token = localStorage.getItem('token');
+  const headers: any = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return fetch(url, { headers }).then(res => {
+    if (!res.ok) throw new Error('Failed to fetch');
+    return res.json();
+  });
+};
 
 export default function NoteDetails() {
   const { id } = useParams();
   const router = useRouter();
   
-  const [note, setNote] = useState<any>(null);
-  const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   
   // Report Modal State
   const [showReportModal, setShowReportModal] = useState(false);
@@ -22,55 +30,27 @@ export default function NoteDetails() {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // Use SWR for blazing fast fetching and caching
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const { data: note, error: noteError, isLoading: loadingNote } = useSWR(id ? `${apiUrl}/api/notes/${id}` : null, fetcher);
+  const { data: comments, mutate: mutateComments } = useSWR(id ? `${apiUrl}/api/notes/${id}/comments` : null, fetcher);
+
   useEffect(() => {
-    // Decode user from token for basic UI checks
+    // Safely decode user from token
     const token = localStorage.getItem('token');
     if (token) {
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(atob(base64));
         setCurrentUser(payload);
-      } catch (e) {}
-    }
-    
-    if (id) {
-      fetchNoteDetails();
-      fetchComments();
-    }
-  }, [id]);
-
-  const fetchNoteDetails = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const headers: any = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + `/api/notes/${id}`, { headers });
-      if (res.ok) {
-        setNote(await res.json());
-      } else {
-        setError('Failed to load note.');
+      } catch (e) {
+        console.error("Failed to decode token", e);
       }
-    } catch (e) {
-      setError('Failed to connect to server.');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchComments = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const headers: any = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + `/api/notes/${id}/comments`, { headers });
-      if (res.ok) {
-        setComments(await res.json());
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  // Replaced manual fetch functions with SWR hooks
 
   const handlePostComment = async () => {
     if (!newComment.trim()) return;
@@ -91,7 +71,7 @@ export default function NoteDetails() {
       });
       if (res.ok) {
         setNewComment('');
-        fetchComments();
+        mutateComments(); // Instantly refresh comments via SWR
       } else {
         alert("Failed to post comment.");
       }
@@ -111,7 +91,7 @@ export default function NoteDetails() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        setComments(prev => prev.filter(c => c.id !== commentId));
+        mutateComments(); // Refresh using SWR
       } else {
         const data = await res.json();
         alert(data.error || "Failed to delete comment");
@@ -172,20 +152,20 @@ export default function NoteDetails() {
     setReportDescription('');
   };
 
-  if (loading) return <div className={styles.loading}>Loading...</div>;
-  if (error || !note) return <div className={styles.error}>{error || "Note not found"}</div>;
+  if (loadingNote) return <div className={styles.loading}>Loading...</div>;
+  if (noteError || !note) return <div className={styles.error}>Note not found or failed to load.</div>;
 
   return (
     <div className={styles.container}>
       <nav className={styles.navbar}>
         <div className={styles.navLeft}>
-          <a href="/browse" className={styles.navLink}>← BACK TO DISCOVER</a>
+          <Link href="/browse" className={styles.navLink}>← BACK TO DISCOVER</Link>
         </div>
         <div className={styles.navCenter}>
           <h1 className={styles.logo}>STUDOCS</h1>
         </div>
         <div className={styles.navRight}>
-          <a href="/upload" className={styles.navLink}>UPLOAD</a>
+          <Link href="/upload" className={styles.navLink}>UPLOAD</Link>
         </div>
       </nav>
 
@@ -201,7 +181,7 @@ export default function NoteDetails() {
           </div>
           <h1 className={styles.title}>{note.title}</h1>
           <div className={styles.meta}>
-            {note.branch} • Year {note.academic_year} • Uploaded by <a href={`/profile/${note.uploader_id}`} style={{ color: '#000', textDecoration: 'underline' }}>{note.uploader_name}</a> on {new Date(note.created_at).toLocaleDateString()}
+            {note.branch} • Year {note.academic_year} • Uploaded by <Link href={`/profile/${note.uploader_id}`} style={{ color: '#000', textDecoration: 'underline' }}>{note.uploader_name}</Link> on {new Date(note.created_at).toLocaleDateString()}
           </div>
           <div className={styles.description}>
             {note.description || "No description provided."}
@@ -226,7 +206,7 @@ export default function NoteDetails() {
           </div>
 
           <div className={styles.commentsList}>
-            {comments.map(comment => (
+            {comments?.map((comment: any) => (
               <div key={comment.id} className={styles.commentCard}>
                 <div className={styles.commentHeader}>
                   <div className={styles.commentMeta}>
