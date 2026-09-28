@@ -204,6 +204,9 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
         [title, description, note_type, difficulty_level, visibility, file_url, file_size_bytes, file_type, branch, academicYearVal, semesterVal, examYearVal, uploader_id, fileHash]
       );
       
+      if (redisClient.isReady) {
+        await redisClient.flushDb().catch(console.error);
+      }
       res.status(201).json(result.rows[0]);
     } catch (dbError) {
       // Handle race condition: Postgres unique violation (code 23505)
@@ -242,10 +245,23 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to delete this note or note not found' });
     }
 
-    // We do NOT delete the file from Supabase immediately on soft delete.
-    // A separate cleanup job will handle permanent deletions.
+    const note = result.rows[0];
+    if (note.file_url) {
+      try {
+        const filePath = note.file_url.split('/notes/')[1];
+        if (filePath) {
+          await supabase.storage.from('notes').remove([filePath]);
+        }
+      } catch (err) {
+        console.error('Failed to delete file from Supabase:', err);
+      }
+    }
+
+    if (redisClient.isReady) {
+      await redisClient.flushDb().catch(console.error);
+    }
     
-    res.json({ success: true, message: 'Note deleted successfully' });
+    res.json({ success: true, message: 'Note and file deleted successfully' });
   } catch (error) {
     console.error('Error deleting note:', error);
     res.status(500).json({ error: 'Failed to delete note' });
