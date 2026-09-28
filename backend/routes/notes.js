@@ -14,6 +14,25 @@ const supabaseUrl = process.env.SUPABASE_URL || 'https://dummy.supabase.co';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Helper to convert public URLs or file paths to temporary signed URLs (1 hour expiry)
+async function applySignedUrls(rows) {
+  if (!rows || rows.length === 0) return rows;
+  const paths = rows.map(n => n.file_path || (n.file_url ? n.file_url.split('/notes/')[1] : null)).filter(Boolean);
+  if (paths.length === 0) return rows;
+  
+  const { data: signedUrls, error } = await supabase.storage.from('notes').createSignedUrls(paths, 3600);
+  if (error || !signedUrls) return rows;
+  
+  return rows.map(n => {
+    const path = n.file_path || (n.file_url ? n.file_url.split('/notes/')[1] : null);
+    const signedInfo = signedUrls.find(s => s.path === path);
+    if (signedInfo && !signedInfo.error) {
+       n.file_url = signedInfo.signedUrl; // Safely replace public URL with short-lived Signed URL for the frontend
+    }
+    return n;
+  });
+}
+
 // Set up Multer for memory storage (we will upload buffer to Supabase)
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -89,14 +108,19 @@ router.get('/', async (req, res) => {
     
     const totalCount = countResult.rows[0].count;
     
+    let finalRows = result.rows;
+    if (finalRows.length > 0) {
+      finalRows = await applySignedUrls(finalRows);
+    }
+    
     if (isCacheable && redisClient.isReady) {
       // Cache for 5 minutes
-      await redisClient.setEx(cacheKey, 300, JSON.stringify({ rows: result.rows, count: totalCount }));
+      await redisClient.setEx(cacheKey, 300, JSON.stringify({ rows: finalRows, count: totalCount }));
     }
     
     res.setHeader('X-Total-Count', totalCount);
     res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
-    res.json(result.rows);
+    res.json(finalRows);
   } catch (error) {
     console.error('Error fetching notes:', error);
     res.status(500).json({ error: 'Failed to fetch notes' });
@@ -113,7 +137,8 @@ router.get('/my-uploads', authenticateToken, async (req, res) => {
        ORDER BY n.created_at DESC`,
       [req.user.userId]
     );
-    res.json(result.rows);
+    const finalRows = await applySignedUrls(result.rows);
+    res.json(finalRows);
   } catch (error) {
     console.error('Error fetching user uploads:', error);
     res.status(500).json({ error: 'Failed to fetch your uploads' });
@@ -278,6 +303,7 @@ router.put('/:id', authenticateToken, upload.single('file'), async (req, res) =>
     
     // If a new file is uploaded, upload it to Supabase first
     let file_url = null;
+    let file_path = null;
     let file_size_bytes = null;
     let file_type = null;
 
@@ -286,11 +312,11 @@ router.put('/:id', authenticateToken, upload.single('file'), async (req, res) =>
       const timestamp = Date.now();
       const ext = file.originalname.split('.').pop() || 'pdf';
       const fileName = `${timestamp}-${title.replace(/\s+/g, '-')}.${ext}`;
-      const filePath = `${req.user.userId}/${fileName}`;
+      file_path = `${req.user.userId}/${fileName}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('notes')
-        .upload(filePath, file.buffer, {
+        .upload(file_path, file.buffer, {
           contentType: file.mimetype,
         });
 
@@ -301,7 +327,7 @@ router.put('/:id', authenticateToken, upload.single('file'), async (req, res) =>
 
       const { data: urlData } = supabase.storage
         .from('notes')
-        .getPublicUrl(filePath);
+        .getPublicUrl(file_path);
 
       file_url = urlData.publicUrl;
       file_size_bytes = file.size;
@@ -313,8 +339,8 @@ router.put('/:id', authenticateToken, upload.single('file'), async (req, res) =>
     let paramCount = 4;
 
     if (file_url) {
-      query += `, file_url = $${paramCount++}, file_size_bytes = $${paramCount++}, file_type = $${paramCount++}`;
-      params.push(file_url, file_size_bytes, file_type);
+      query += `, file_url = $${paramCount++}, file_path = $${paramCount++}, file_size_bytes = $${paramCount++}, file_type = $${paramCount++}`;
+      params.push(file_url, file_path, file_size_bytes, file_type);
     }
 
     query += ` WHERE id = $${paramCount++} AND uploader_id = $${paramCount} AND deleted_at IS NULL RETURNING *`;
@@ -326,7 +352,12 @@ router.put('/:id', authenticateToken, upload.single('file'), async (req, res) =>
       return res.status(403).json({ error: 'Not authorized to edit this note or note not found' });
     }
     
-    res.json({ success: true, note: result.rows[0] });
+    if (redisClient.isReady) {
+      await redisClient.flushDb().catch(console.error);
+    }
+    
+    const finalRows = await applySignedUrls([result.rows[0]]);
+    res.json({ success: true, note: finalRows[0] });
   } catch (error) {
     console.error('Error updating note:', error);
     res.status(500).json({ error: 'Failed to update note' });
@@ -372,7 +403,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
     // Increment view count asynchronously
     db.query('UPDATE notes SET view_count = view_count + 1 WHERE id = $1', [req.params.id]).catch(console.error);
     
-    res.json(result.rows[0]);
+    const finalRows = await applySignedUrls([result.rows[0]]);
+    res.json(finalRows[0]);
   } catch (error) {
     console.error('Error fetching note details:', error);
     res.status(500).json({ error: 'Failed to fetch note details' });
