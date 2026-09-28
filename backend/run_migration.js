@@ -13,9 +13,14 @@ async function runMigration() {
   });
 
   try {
-    const sql = fs.readFileSync(path.join(__dirname, 'migrations', '001_hybrid_auth.sql'), 'utf8');
+    const migrationFile = process.argv[2];
+    if (!migrationFile) {
+      console.error('Please provide a migration file name (e.g., node run_migration.js 001_hybrid_auth.sql)');
+      process.exit(1);
+    }
+    const sql = fs.readFileSync(path.join(__dirname, 'migrations', migrationFile), 'utf8');
     await pool.query(sql);
-    console.log('Migration successful!');
+    console.log(`Migration ${migrationFile} successful!`);
   } catch (err) {
     console.error('Migration failed:', err);
   } finally {

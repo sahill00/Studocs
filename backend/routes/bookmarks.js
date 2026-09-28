@@ -27,6 +27,7 @@ router.get('/', authenticateToken, async (req, res) => {
        JOIN bookmarks b ON n.id = b.note_id 
        WHERE b.user_id = $1 
          AND (n.status IS NULL OR n.status != 'hidden')
+         AND n.deleted_at IS NULL
          AND (n.visibility = 'PUBLIC' OR n.uploader_id = $1)
        ORDER BY b.created_at DESC`,
       [req.user.userId]

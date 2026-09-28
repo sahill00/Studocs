@@ -17,13 +17,18 @@ export const metadata: Metadata = {
   description: "Join a community of students sharing high-quality resources, notes, and exams.",
 };
 
+import NotificationsBell from "@/components/NotificationsBell";
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <NotificationsBell />
+      </body>
     </html>
   );
 }

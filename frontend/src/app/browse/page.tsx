@@ -8,6 +8,9 @@ export default function BrowseNotes() {
   const router = useRouter();
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const limit = 20;
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState({
     branch: '',
@@ -35,7 +38,7 @@ export default function BrowseNotes() {
   useEffect(() => {
     fetchNotes();
     fetchBookmarks();
-  }, [filters]);
+  }, [filters, page]);
 
   const fetchBookmarks = async () => {
     const token = localStorage.getItem('token');
@@ -61,8 +64,13 @@ export default function BrowseNotes() {
       if (filters.note_type) params.append('note_type', filters.note_type);
       if (filters.search) params.append('search', filters.search);
 
+      params.append('limit', limit.toString());
+      params.append('offset', ((page - 1) * limit).toString());
+
       const response = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + `/api/notes?${params.toString()}`);
       if (response.ok) {
+        const total = response.headers.get('X-Total-Count');
+        if (total) setTotalCount(parseInt(total));
         const data = await response.json();
         setNotes(data);
       }
@@ -74,6 +82,7 @@ export default function BrowseNotes() {
   };
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+    setPage(1);
     setFilters({
       ...filters,
       [e.target.name]: e.target.value

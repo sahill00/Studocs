@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const jwt = require('jsonwebtoken');
+const redisClient = require('../redisClient');
 
 const router = express.Router();
 
@@ -28,9 +29,29 @@ const authenticateAdmin = async (req, res, next) => {
 
 router.use(authenticateAdmin);
 
+// Helper to log admin actions
+const logAdminAction = async (adminId, action, entityType, entityId, details = null) => {
+  try {
+    await db.query(
+      'INSERT INTO admin_logs (admin_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5)',
+      [adminId, action, entityType, entityId, details]
+    );
+  } catch (err) {
+    console.error('Failed to log admin action:', err);
+  }
+};
+
 // Dashboard Overview
 router.get('/overview', async (req, res) => {
   try {
+    const cacheKey = 'admin_overview';
+    if (redisClient.isReady) {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+    }
+    
     const usersCount = await db.query('SELECT COUNT(*) FROM users');
     const notesCount = await db.query("SELECT COUNT(*) FROM notes WHERE status = 'active'");
     const commentsCount = await db.query('SELECT COUNT(*) FROM comments WHERE deleted_at IS NULL');
@@ -42,7 +63,7 @@ router.get('/overview', async (req, res) => {
     const notesToday = await db.query('SELECT COUNT(*) FROM notes WHERE created_at >= $1', [today]);
     const reportsToday = await db.query('SELECT COUNT(*) FROM reports WHERE created_at >= $1', [today]);
 
-    res.json({
+    const result = {
       totalUsers: parseInt(usersCount.rows[0].count),
       totalNotes: parseInt(notesCount.rows[0].count),
       totalComments: parseInt(commentsCount.rows[0].count),
@@ -50,7 +71,13 @@ router.get('/overview', async (req, res) => {
       resolvedReports: parseInt(resolvedReportsCount.rows[0].count),
       notesToday: parseInt(notesToday.rows[0].count),
       reportsToday: parseInt(reportsToday.rows[0].count)
-    });
+    };
+    
+    if (redisClient.isReady) {
+      await redisClient.setEx(cacheKey, 60, JSON.stringify(result)); // cache for 60 seconds
+    }
+    
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to load overview.' });
@@ -136,6 +163,8 @@ router.patch('/reports/:id', async (req, res) => {
       [status, req.user.userId, admin_note, id]
     );
     
+    await logAdminAction(req.user.userId, `updated_report_status_to_${status}`, 'report', id, admin_note);
+    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update report.' });
@@ -147,6 +176,7 @@ router.delete('/comments/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await db.query('UPDATE comments SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1', [id]);
+    await logAdminAction(req.user.userId, 'deleted_comment', 'comment', id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to moderate comment.' });
@@ -181,6 +211,7 @@ router.patch('/notes/:id/status', async (req, res) => {
     }
     
     await db.query('UPDATE notes SET status = $1 WHERE id = $2', [status, id]);
+    await logAdminAction(req.user.userId, `updated_note_status_to_${status}`, 'note', id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to moderate note.' });
@@ -201,6 +232,58 @@ router.get('/notes', async (req, res) => {
   } catch (err) {
     console.error('Error fetching admin notes:', err);
     res.status(500).json({ error: 'Failed to fetch notes.' });
+  }
+});
+
+// BULK MODERATE Notes
+router.patch('/notes/bulk-status', async (req, res) => {
+  try {
+    const { ids, status } = req.body;
+    
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'List of IDs required.' });
+    }
+    
+    if (!['active', 'hidden', 'removed'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status.' });
+    }
+    
+    await db.query('UPDATE notes SET status = $1 WHERE id = ANY($2::int[])', [status, ids]);
+    await logAdminAction(req.user.userId, `bulk_updated_notes_status_to_${status}`, 'note', null, `IDs: ${ids.join(',')}`);
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to bulk moderate notes.' });
+  }
+});
+
+// BAN / UNBAN User
+router.patch('/users/:id/ban', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_active } = req.body; // false to ban, true to unban
+    
+    await db.query('UPDATE users SET is_active = $1 WHERE id = $2', [is_active, id]);
+    await logAdminAction(req.user.userId, is_active ? 'unbanned_user' : 'banned_user', 'user', id);
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update user status.' });
+  }
+});
+
+// GET Admin Logs
+router.get('/logs', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT l.*, u.email as admin_email 
+       FROM admin_logs l
+       LEFT JOIN users u ON l.admin_id = u.id
+       ORDER BY l.created_at DESC LIMIT 100`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch admin logs.' });
   }
 });
 

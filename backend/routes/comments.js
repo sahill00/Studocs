@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const jwt = require('jsonwebtoken');
+const xss = require('xss');
 
 const router = express.Router({ mergeParams: true }); // to access :noteId if mounted on /api/notes/:noteId/comments
 
@@ -57,13 +58,14 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     const { noteId } = req.params;
     const targetNoteId = noteId || req.body.note_id || null;
-    const { content } = req.body;
+    const rawContent = req.body.content;
+    const content = rawContent ? xss(rawContent) : '';
 
     if (!content || content.trim().length === 0) return res.status(400).json({ error: 'Comment content is required.' });
     if (content.length > 2000) return res.status(400).json({ error: 'Comment is too long.' });
 
     if (targetNoteId) {
-      const noteCheck = await db.query('SELECT id FROM notes WHERE id = $1', [targetNoteId]);
+      const noteCheck = await db.query('SELECT id FROM notes WHERE id = $1 AND deleted_at IS NULL', [targetNoteId]);
       if (noteCheck.rows.length === 0) return res.status(404).json({ error: 'Note not found.' });
     } else {
       // Rate limit check: max 10 requests per day
@@ -84,6 +86,26 @@ router.post('/', authenticateToken, async (req, res) => {
        RETURNING *`,
       [targetNoteId, req.user.userId, content.trim()]
     );
+
+    // Send notification to note uploader
+    if (targetNoteId) {
+      const uploaderRes = await db.query('SELECT uploader_id, title FROM notes WHERE id = $1', [targetNoteId]);
+      if (uploaderRes.rows.length > 0) {
+        const uploaderId = uploaderRes.rows[0].uploader_id;
+        const noteTitle = uploaderRes.rows[0].title;
+        // Don't notify if the user commented on their own note
+        if (uploaderId !== req.user.userId) {
+          const userRes = await db.query('SELECT full_name FROM users WHERE id = $1', [req.user.userId]);
+          const commenterName = userRes.rows.length > 0 ? userRes.rows[0].full_name || 'Someone' : 'Someone';
+          
+          await db.query(
+            `INSERT INTO notifications (user_id, actor_id, type, entity_id, message) 
+             VALUES ($1, $2, $3, $4, $5)`,
+            [uploaderId, req.user.userId, 'comment', targetNoteId, `${commenterName} commented on your note: "${noteTitle}"`]
+          );
+        }
+      }
+    }
 
     res.json(result.rows[0]);
   } catch (error) {

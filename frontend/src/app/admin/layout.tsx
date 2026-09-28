@@ -38,6 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <a href="/admin" className={styles.navLink}>Dashboard</a>
           <a href="/admin/reports" className={styles.navLink}>Reports 🔔</a>
           <a href="/admin/notes" className={styles.navLink}>Notes</a>
+          <a href="/admin/logs" className={styles.navLink}>Audit Logs</a>
           <a href="/browse" className={styles.navLink} style={{ marginTop: 'auto', color: '#ff4444' }}>Exit Admin</a>
         </nav>
       </aside>

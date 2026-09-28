@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const xss = require('xss');
+const redisClient = require('../redisClient');
 
 const router = express.Router();
 
@@ -15,7 +17,15 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Set up Multer for memory storage (we will upload buffer to Supabase)
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, JPG, PNG, and WebP are allowed.'));
+    }
+  }
 });
 
 // Middleware to authenticate JWT
@@ -37,7 +47,21 @@ router.get('/', async (req, res) => {
   try {
     const { branch, academic_year, semester, note_type, search, limit = 20, offset = 0 } = req.query;
     
-    let query = 'SELECT n.*, u.full_name as uploader_name FROM notes n JOIN users u ON n.uploader_id = u.id WHERE n.visibility = $1 AND (n.status IS NULL OR n.status != $2)';
+    // Check cache if there are no specific search filters
+    const isCacheable = !branch && !academic_year && !semester && !note_type && !search;
+    const cacheKey = `notes_feed_${limit}_${offset}`;
+    
+    if (isCacheable && redisClient.isReady) {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        const { rows, count } = JSON.parse(cached);
+        res.setHeader('X-Total-Count', count);
+        res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
+        return res.json(rows);
+      }
+    }
+    
+    let query = 'SELECT n.*, u.full_name as uploader_name FROM notes n JOIN users u ON n.uploader_id = u.id WHERE n.visibility = $1 AND (n.status IS NULL OR n.status != $2) AND n.deleted_at IS NULL';
     let params = ['PUBLIC', 'hidden'];
     let paramCount = 3;
     
@@ -45,12 +69,31 @@ router.get('/', async (req, res) => {
     if (academic_year) { query += ` AND n.academic_year = $${paramCount++}`; params.push(academic_year); }
     if (semester) { query += ` AND n.semester = $${paramCount++}`; params.push(semester); }
     if (note_type) { query += ` AND n.note_type = $${paramCount++}`; params.push(note_type); }
-    if (search) { query += ` AND n.title ILIKE $${paramCount++}`; params.push(`%${search}%`); }
+    if (search) { 
+      query += ` AND (n.title ILIKE $${paramCount} OR n.description ILIKE $${paramCount} OR n.branch ILIKE $${paramCount})`; 
+      params.push(`%${search}%`); 
+      paramCount++;
+    }
     
+    const countQuery = query.replace('SELECT n.*, u.full_name as uploader_name', 'SELECT COUNT(*)');
     query += ` ORDER BY COALESCE(n.upvotes, 0) DESC, n.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount}`;
+    
+    // We only pass params for count query without limit and offset
+    const countParams = [...params];
     params.push(limit, offset);
     
+    const countResult = await db.query(countQuery, countParams);
     const result = await db.query(query, params);
+    
+    const totalCount = countResult.rows[0].count;
+    
+    if (isCacheable && redisClient.isReady) {
+      // Cache for 5 minutes
+      await redisClient.setEx(cacheKey, 300, JSON.stringify({ rows: result.rows, count: totalCount }));
+    }
+    
+    res.setHeader('X-Total-Count', totalCount);
+    res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching notes:', error);
@@ -64,7 +107,7 @@ router.get('/my-uploads', authenticateToken, async (req, res) => {
     const result = await db.query(
       `SELECT n.*, u.full_name as uploader_name 
        FROM notes n JOIN users u ON n.uploader_id = u.id 
-       WHERE n.uploader_id = $1 
+       WHERE n.uploader_id = $1 AND n.deleted_at IS NULL
        ORDER BY n.created_at DESC`,
       [req.user.userId]
     );
@@ -79,9 +122,13 @@ router.get('/my-uploads', authenticateToken, async (req, res) => {
 router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
   try {
     const { 
-      title, description = null, note_type, difficulty_level = null, 
+      note_type, difficulty_level = null, 
       visibility = 'PUBLIC', branch = null, academic_year = null, semester = null, exam_year = null
     } = req.body;
+    
+    // Sanitize user inputs
+    const title = xss(req.body.title);
+    const description = req.body.description ? xss(req.body.description) : null;
     
     const examYearVal = (exam_year === '' || exam_year === 'undefined') ? null : exam_year;
     const academicYearVal = (academic_year === '' || academic_year === 'undefined') ? null : academic_year;
@@ -99,7 +146,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     const fileHash = crypto.createHash('sha256').update(file.buffer).digest('hex');
     
     // Check if the hash already exists
-    const duplicateCheck = await db.query('SELECT id FROM notes WHERE file_hash = $1', [fileHash]);
+    const duplicateCheck = await db.query('SELECT id FROM notes WHERE file_hash = $1 AND deleted_at IS NULL', [fileHash]);
     if (duplicateCheck.rows.length > 0) {
       return res.status(409).json({
         success: false,
@@ -114,16 +161,30 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     const fileName = `${timestamp}-${title.replace(/\s+/g, '-')}.${ext}`;
     const filePath = `${uploader_id}/${fileName}`;
 
-    // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('notes')
-      .upload(filePath, file.buffer, {
-        contentType: file.mimetype,
-      });
+    // Upload to Supabase Storage with retry logic
+    let uploadData, uploadError;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      const res = await supabase.storage
+        .from('notes')
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+        });
+        
+      uploadData = res.data;
+      uploadError = res.error;
+      
+      if (!uploadError) break;
+      attempts++;
+      console.log(`Supabase upload failed, retrying attempt ${attempts}...`);
+      await new Promise(r => setTimeout(r, 1000 * attempts)); // exponential-ish backoff
+    }
 
     if (uploadError) {
-      console.error("Supabase upload error:", uploadError);
-      return res.status(500).json({ error: 'Failed to upload file to storage' });
+      console.error("Supabase upload error after retries:", uploadError);
+      return res.status(500).json({ error: 'Failed to upload file to storage after multiple attempts.' });
     }
 
     // Get public URL
@@ -148,7 +209,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
       // Handle race condition: Postgres unique violation (code 23505)
       if (dbError.code === '23505') {
         // Find existing note id if possible
-        const existing = await db.query('SELECT id FROM notes WHERE file_hash = $1', [fileHash]);
+        const existing = await db.query('SELECT id FROM notes WHERE file_hash = $1 AND deleted_at IS NULL', [fileHash]);
         const existingNoteId = existing.rows.length > 0 ? existing.rows[0].id : null;
         
         // Clean up orphaned Supabase file safely in background
@@ -173,7 +234,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const result = await db.query(
-      'DELETE FROM notes WHERE id = $1 AND uploader_id = $2 RETURNING id, file_url',
+      'UPDATE notes SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND uploader_id = $2 AND deleted_at IS NULL RETURNING id, file_url',
       [req.params.id, req.user.userId]
     );
     
@@ -181,18 +242,8 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to delete this note or note not found' });
     }
 
-    const fileUrl = result.rows[0].file_url;
-    if (fileUrl && fileUrl.includes('/public/notes/')) {
-      const filePath = fileUrl.split('/public/notes/')[1];
-      if (filePath) {
-        const { error: storageError } = await supabase.storage
-          .from('notes')
-          .remove([decodeURIComponent(filePath)]);
-        if (storageError) {
-          console.error('Supabase delete error:', storageError);
-        }
-      }
-    }
+    // We do NOT delete the file from Supabase immediately on soft delete.
+    // A separate cleanup job will handle permanent deletions.
     
     res.json({ success: true, message: 'Note deleted successfully' });
   } catch (error) {
@@ -204,7 +255,9 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 // Update a note (requires authentication and ownership)
 router.put('/:id', authenticateToken, upload.single('file'), async (req, res) => {
   try {
-    const { title, description, visibility } = req.body;
+    const visibility = req.body.visibility;
+    const title = xss(req.body.title);
+    const description = req.body.description ? xss(req.body.description) : null;
     
     // If a new file is uploaded, upload it to Supabase first
     let file_url = null;
@@ -247,7 +300,7 @@ router.put('/:id', authenticateToken, upload.single('file'), async (req, res) =>
       params.push(file_url, file_size_bytes, file_type);
     }
 
-    query += ` WHERE id = $${paramCount++} AND uploader_id = $${paramCount} RETURNING *`;
+    query += ` WHERE id = $${paramCount++} AND uploader_id = $${paramCount} AND deleted_at IS NULL RETURNING *`;
     params.push(req.params.id, req.user.userId);
 
     const result = await db.query(query, params);
@@ -283,7 +336,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const result = await db.query(
       `SELECT n.*, u.full_name as uploader_name 
        FROM notes n JOIN users u ON n.uploader_id = u.id 
-       WHERE n.id = $1 AND (n.status IS NULL OR n.status != 'hidden')`, 
+       WHERE n.id = $1 AND (n.status IS NULL OR n.status != 'hidden') AND n.deleted_at IS NULL`, 
       [req.params.id]
     );
     
@@ -312,13 +365,27 @@ router.get('/:id', optionalAuth, async (req, res) => {
 router.post('/:id/upvote', authenticateToken, async (req, res) => {
   try {
     const result = await db.query(
-      'UPDATE notes SET upvotes = COALESCE(upvotes, 0) + 1 WHERE id = $1 RETURNING upvotes',
+      'UPDATE notes SET upvotes = COALESCE(upvotes, 0) + 1 WHERE id = $1 RETURNING upvotes, uploader_id, title',
       [req.params.id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Note not found' });
     }
-    res.json({ success: true, upvotes: result.rows[0].upvotes });
+    
+    const { upvotes, uploader_id, title } = result.rows[0];
+    
+    if (uploader_id && uploader_id !== req.user.userId) {
+      const userRes = await db.query('SELECT full_name FROM users WHERE id = $1', [req.user.userId]);
+      const upvoterName = userRes.rows.length > 0 ? userRes.rows[0].full_name || 'Someone' : 'Someone';
+      
+      await db.query(
+        `INSERT INTO notifications (user_id, actor_id, type, entity_id, message) 
+         VALUES ($1, $2, $3, $4, $5)`,
+        [uploader_id, req.user.userId, 'upvote', req.params.id, `${upvoterName} upvoted your note: "${title}"`]
+      );
+    }
+    
+    res.json({ success: true, upvotes });
   } catch (error) {
     console.error('Error upvoting note:', error);
     res.status(500).json({ error: 'Failed to upvote note' });

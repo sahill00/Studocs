@@ -201,7 +201,7 @@ export default function NoteDetails() {
           </div>
           <h1 className={styles.title}>{note.title}</h1>
           <div className={styles.meta}>
-            {note.branch} • Year {note.academic_year} • Uploaded by {note.uploader_name} on {new Date(note.created_at).toLocaleDateString()}
+            {note.branch} • Year {note.academic_year} • Uploaded by <a href={`/profile/${note.uploader_id}`} style={{ color: '#000', textDecoration: 'underline' }}>{note.uploader_name}</a> on {new Date(note.created_at).toLocaleDateString()}
           </div>
           <div className={styles.description}>
             {note.description || "No description provided."}
