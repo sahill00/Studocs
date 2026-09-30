@@ -277,7 +277,7 @@ router.post('/google', async (req: Request, res: Response) => {
 
     if (result.rows.length === 0) {
       const insertResult = await db.query(
-        `INSERT INTO users (full_name, email, google_id) VALUES ($1, $2, $3) RETURNING id, full_name, email`,
+        `INSERT INTO users (full_name, email, google_id) VALUES ($1, $2, $3) RETURNING id, full_name, email, role`,
         [name, email, google_id]
       );
       user = insertResult.rows[0];
