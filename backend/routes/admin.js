@@ -215,7 +215,7 @@ router.patch('/notes/:id/status', async (req, res) => {
        const noteRes = await db.query('SELECT file_path FROM notes WHERE id = $1', [id]);
        if (noteRes.rows.length > 0 && noteRes.rows[0].file_path) {
           const { createClient } = require('@supabase/supabase-js');
-          const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+          const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
           await supabase.storage.from('notes').remove([noteRes.rows[0].file_path]);
           // We can optionally clear file_url/file_path but we need the file name for the user
        }
