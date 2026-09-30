@@ -82,7 +82,7 @@ router.get('/', async (req, res) => {
       }
     }
     
-    let query = 'SELECT n.*, u.full_name as uploader_name FROM notes n JOIN users u ON n.uploader_id = u.id WHERE n.visibility = $1 AND (n.status IS NULL OR n.status != $2) AND n.deleted_at IS NULL';
+    let query = 'SELECT n.*, u.full_name as uploader_name FROM notes n JOIN users u ON n.uploader_id = u.id WHERE UPPER(n.visibility) = UPPER($1) AND (n.status IS NULL OR UPPER(n.status) != UPPER($2)) AND n.deleted_at IS NULL';
     let params = ['PUBLIC', 'hidden'];
     let paramCount = 3;
     
@@ -97,7 +97,7 @@ router.get('/', async (req, res) => {
     }
     
     const countQuery = query.replace('SELECT n.*, u.full_name as uploader_name', 'SELECT COUNT(*)');
-    query += ` ORDER BY COALESCE(n.upvotes, 0) DESC, n.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount}`;
+    query += ` ORDER BY n.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount}`;
     
     // We only pass params for count query without limit and offset
     const countParams = [...params];
