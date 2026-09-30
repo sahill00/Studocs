@@ -178,38 +178,47 @@ export default function MyUploads() {
           <div className={styles.notesGrid}>
             {notes.map(note => (
               <div key={note.id} className={styles.noteCard}>
-                <div className={styles.noteHeader}>
-                  <span className={styles.noteType}>{note.note_type}</span>
-                  <span className={styles.difficulty}>{note.difficulty_level || 'N/A'}</span>
-                </div>
-                <h3 className={styles.noteTitle}>{note.title}</h3>
-                <p className={styles.noteDesc} style={{ marginBottom: '0.5rem' }}>
-                  {note.description || "No description provided."}
-                </p>
+                {note.status === 'removed' ? (
+                  <div style={{ padding: '1rem', color: '#ff4444', textAlign: 'center', border: '1px solid #ff4444', borderRadius: '8px', background: 'rgba(255, 68, 68, 0.1)' }}>
+                    <h3>⚠️ Note Deleted by Admin</h3>
+                    <p style={{ marginTop: '0.5rem' }}>Your note <strong>{note.title}</strong> was removed by an administrator due to a policy violation.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className={styles.noteHeader}>
+                      <span className={styles.noteType}>{note.note_type}</span>
+                      <span className={styles.difficulty}>{note.difficulty_level || 'N/A'}</span>
+                    </div>
+                    <h3 className={styles.noteTitle}>{note.title}</h3>
+                    <p className={styles.noteDesc} style={{ marginBottom: '0.5rem' }}>
+                      {note.description || "No description provided."}
+                    </p>
 
-                <div className={styles.noteMeta}>
-                  <span>{note.branch} • Year {note.academic_year}</span>
-                </div>
-                <div className={styles.cardActions} style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
-                  <button 
-                    style={{ background: 'var(--primary-color)', border: 'none', color: '#000', padding: '0.25rem 0.75rem', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', borderRadius: '4px', fontWeight: 'bold' }}
-                    onClick={() => handleRead(note.file_url)}
-                  >
-                    READ
-                  </button>
-                  <button 
-                    style={{ background: 'transparent', border: '1px solid #fff', color: '#fff', padding: '0.25rem 0.75rem', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', borderRadius: '4px' }}
-                    onClick={() => handleEditClick(note.id)}
-                  >
-                    REPLACE FILE & EDIT
-                  </button>
-                  <button 
-                    style={{ background: 'transparent', border: '1px solid #ff4444', color: '#ff4444', padding: '0.25rem 0.75rem', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', borderRadius: '4px' }}
-                    onClick={() => handleDelete(note.id)}
-                  >
-                    DELETE
-                  </button>
-                </div>
+                    <div className={styles.noteMeta}>
+                      <span>{note.branch} • Year {note.academic_year}</span>
+                    </div>
+                    <div className={styles.cardActions} style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+                      <button 
+                        style={{ background: 'var(--primary-color)', border: 'none', color: '#000', padding: '0.25rem 0.75rem', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', borderRadius: '4px', fontWeight: 'bold' }}
+                        onClick={() => handleRead(note.file_url)}
+                      >
+                        READ
+                      </button>
+                      <button 
+                        style={{ background: 'transparent', border: '1px solid #fff', color: '#fff', padding: '0.25rem 0.75rem', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', borderRadius: '4px' }}
+                        onClick={() => handleEditClick(note.id)}
+                      >
+                        REPLACE FILE & EDIT
+                      </button>
+                      <button 
+                        style={{ background: 'transparent', border: '1px solid #ff4444', color: '#ff4444', padding: '0.25rem 0.75rem', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', borderRadius: '4px' }}
+                        onClick={() => handleDelete(note.id)}
+                      >
+                        DELETE
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>

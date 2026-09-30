@@ -210,6 +210,17 @@ router.patch('/notes/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status.' });
     }
     
+    // If status is removed, we could delete the physical file to save space
+    if (status === 'removed') {
+       const noteRes = await db.query('SELECT file_path FROM notes WHERE id = $1', [id]);
+       if (noteRes.rows.length > 0 && noteRes.rows[0].file_path) {
+          const { createClient } = require('@supabase/supabase-js');
+          const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+          await supabase.storage.from('notes').remove([noteRes.rows[0].file_path]);
+          // We can optionally clear file_url/file_path but we need the file name for the user
+       }
+    }
+    
     await db.query('UPDATE notes SET status = $1 WHERE id = $2', [status, id]);
     await logAdminAction(req.user.userId, `updated_note_status_to_${status}`, 'note', id);
     res.json({ success: true });

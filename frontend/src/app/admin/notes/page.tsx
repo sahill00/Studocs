@@ -79,16 +79,25 @@ export default function AdminNotes() {
                 <td>{note.uploader_name}</td>
                 <td>{note.branch} - Year {note.academic_year}</td>
                 <td>
-                  <span className={styles.statusTag} style={{ background: note.status === 'hidden' ? '#f44336' : '#4caf50' }}>
-                    {note.status || 'ACTIVE'}
+                  <span className={styles.statusTag} style={{ background: note.status === 'hidden' ? '#f44336' : note.status === 'removed' ? '#ff0000' : '#4caf50' }}>
+                    {note.status ? note.status.toUpperCase() : 'ACTIVE'}
                   </span>
                 </td>
                 <td>
-                  {note.status !== 'hidden' ? (
-                    <button className={`${styles.btnAction} ${styles.btnDanger}`} onClick={() => updateStatus(note.id, 'hidden')}>Hide</button>
-                  ) : (
-                    <button className={styles.btnAction} style={{ borderColor: '#4caf50', color: '#4caf50' }} onClick={() => updateStatus(note.id, 'active')}>Restore</button>
-                  )}
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {note.status !== 'hidden' ? (
+                      <button className={`${styles.btnAction} ${styles.btnDanger}`} onClick={() => updateStatus(note.id, 'hidden')}>Hide</button>
+                    ) : (
+                      <button className={styles.btnAction} style={{ borderColor: '#4caf50', color: '#4caf50' }} onClick={() => updateStatus(note.id, 'active')}>Restore</button>
+                    )}
+                    {note.status !== 'removed' && (
+                      <button className={`${styles.btnAction} ${styles.btnDanger}`} style={{ borderColor: '#ff0000', color: '#ff0000' }} onClick={() => {
+                        if (confirm('Are you sure you want to permanently delete this note? This will delete the file from storage and notify the user.')) {
+                          updateStatus(note.id, 'removed');
+                        }
+                      }}>Delete</button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

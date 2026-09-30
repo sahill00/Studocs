@@ -111,8 +111,7 @@ router.get('/', async (req, res) => {
       params.push(userCollegeId);
     }
     
-    query += `) AND (n.status IS NULL OR UPPER(n.status) != UPPER($${paramCount++})) AND n.deleted_at IS NULL`;
-    params.push('hidden');
+    query += `) AND (n.status IS NULL OR (UPPER(n.status) != 'HIDDEN' AND UPPER(n.status) != 'ADMIN_DELETED' AND UPPER(n.status) != 'REMOVED')) AND n.deleted_at IS NULL`;
     
     if (branch) { query += ` AND n.branch = $${paramCount++}`; params.push(branch); }
     if (academic_year) { query += ` AND n.academic_year = $${paramCount++}`; params.push(academic_year); }
