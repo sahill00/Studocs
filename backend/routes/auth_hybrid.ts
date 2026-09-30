@@ -288,7 +288,7 @@ router.post('/google', async (req: Request, res: Response) => {
       }
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ user, token });
   } catch (error) {
     console.error('Google Auth error:', error);
