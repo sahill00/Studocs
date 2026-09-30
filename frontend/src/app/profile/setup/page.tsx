@@ -151,9 +151,13 @@ export default function ProfileSetup() {
             }}
           >
             <option value="" style={{ color: '#000' }}>Select Branch</option>
-            <option value="CSE" style={{ color: '#000' }}>Computer Science</option>
-            <option value="ECE" style={{ color: '#000' }}>Electronics</option>
-            <option value="Mechanical" style={{ color: '#000' }}>Mechanical</option>
+            <option value="Computer Science" style={{ color: '#000' }}>Computer Science</option>
+            <option value="CSE - AIML" style={{ color: '#000' }}>CSE - AIML</option>
+            <option value="CSE - IOT" style={{ color: '#000' }}>CSE - IOT</option>
+            <option value="IT" style={{ color: '#000' }}>IT</option>
+            <option value="EXTC" style={{ color: '#000' }}>EXTC</option>
+            <option value="Civil" style={{ color: '#000' }}>Civil</option>
+            <option value="Mech - Auto" style={{ color: '#000' }}>Mech - Auto</option>
           </select>
         </div>
 

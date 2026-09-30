@@ -237,6 +237,7 @@ router.get('/notes', async (req, res) => {
       `SELECT n.*, u.full_name as uploader_name 
        FROM notes n 
        JOIN users u ON n.uploader_id = u.id 
+       WHERE n.status IS NULL OR n.status != 'removed'
        ORDER BY n.created_at DESC`
     );
     res.json(result.rows);

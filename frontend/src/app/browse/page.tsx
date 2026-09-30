@@ -277,10 +277,13 @@ export default function BrowseNotes() {
             <label>BRANCH</label>
             <select name="branch" value={filters.branch} onChange={handleFilterChange} className={styles.select}>
               <option value="">All Branches</option>
-              <option value="CSE">Computer Science</option>
-              <option value="ECE">Electronics</option>
-              <option value="Mechanical">Mechanical</option>
+              <option value="Computer Science">Computer Science</option>
+              <option value="CSE - AIML">CSE - AIML</option>
+              <option value="CSE - IOT">CSE - IOT</option>
+              <option value="IT">IT</option>
+              <option value="EXTC">EXTC</option>
               <option value="Civil">Civil</option>
+              <option value="Mech - Auto">Mech - Auto</option>
             </select>
           </div>
 
