@@ -200,7 +200,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     const fileHash = crypto.createHash('sha256').update(file.buffer).digest('hex');
     
     // Check if the hash already exists
-    const duplicateCheck = await db.query('SELECT id FROM notes WHERE file_hash = $1 AND deleted_at IS NULL', [fileHash]);
+    const duplicateCheck = await db.query("SELECT id FROM notes WHERE file_hash = $1 AND deleted_at IS NULL AND (status IS NULL OR status != 'removed')", [fileHash]);
     if (duplicateCheck.rows.length > 0) {
       return res.status(409).json({
         success: false,
