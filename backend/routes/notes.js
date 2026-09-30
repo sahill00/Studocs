@@ -114,8 +114,8 @@ router.get('/', async (req, res) => {
     }
     
     if (isCacheable && redisClient.isReady) {
-      // Cache for 5 minutes
-      await redisClient.setEx(cacheKey, 300, JSON.stringify({ rows: finalRows, count: totalCount }));
+      // Cache for 5 seconds to avoid stale feed
+      await redisClient.setEx(cacheKey, 5, JSON.stringify({ rows: finalRows, count: totalCount }));
     }
     
     res.setHeader('X-Total-Count', totalCount);
