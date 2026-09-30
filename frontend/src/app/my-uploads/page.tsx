@@ -92,7 +92,6 @@ export default function MyUploads() {
       const submitData = new FormData();
       submitData.append('title', newTitle);
       submitData.append('description', noteToEdit.description || '');
-      submitData.append('visibility', noteToEdit.visibility);
       submitData.append('file', file);
 
       const response = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + `/api/notes/${editingNoteId}`, {
@@ -190,7 +189,6 @@ export default function MyUploads() {
 
                 <div className={styles.noteMeta}>
                   <span>{note.branch} • Year {note.academic_year}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{note.visibility}</span>
                 </div>
                 <div className={styles.cardActions} style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
                   <button 

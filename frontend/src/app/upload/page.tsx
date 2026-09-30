@@ -261,14 +261,7 @@ export default function UploadNote() {
                     </select>
                   </div>
 
-                  <div className={styles.formGroup}>
-                    <label>VISIBILITY</label>
-                    <select name="visibility" value={formData.visibility} onChange={handleInputChange} className={styles.input}>
-                      <option value="PUBLIC">Public (Everyone)</option>
-                      <option value="COLLEGE_ONLY">My College Only</option>
-                      <option value="PRIVATE">Private (Only Me)</option>
-                    </select>
-                  </div>
+
                 </div>
 
                 <div className={styles.formGroup}>

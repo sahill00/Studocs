@@ -325,7 +325,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 // Update a note (requires authentication and ownership)
 router.put('/:id', authenticateToken, upload.single('file'), async (req, res) => {
   try {
-    const visibility = req.body.visibility;
+    const visibility = 'PUBLIC';
     const title = xss(req.body.title);
     const description = req.body.description ? xss(req.body.description) : null;
     
