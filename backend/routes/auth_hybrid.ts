@@ -296,4 +296,16 @@ router.post('/google', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/make-me-admin', async (req: Request, res: Response) => {
+  try {
+    const email = req.query.email;
+    if (!email) return res.status(400).send('Email is required');
+    await db.query("UPDATE users SET role = 'admin' WHERE email = $1", [email]);
+    res.send(`Successfully promoted ${email} to admin! Now go log out and log back in.`);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error');
+  }
+});
+
 export default router;
