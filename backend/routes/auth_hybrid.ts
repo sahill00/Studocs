@@ -300,7 +300,7 @@ router.get('/make-me-admin', async (req: Request, res: Response) => {
   try {
     const email = req.query.email;
     if (!email) return res.status(400).send('Email is required');
-    await db.query("UPDATE users SET role = 'admin' WHERE email = $1", [email]);
+    await db.query("UPDATE users SET role = 'admin', college_id = COALESCE(college_id, 1) WHERE email = $1", [email]);
     res.send(`Successfully promoted ${email} to admin! Now go log out and log back in.`);
   } catch (err) {
     console.error(err);
