@@ -72,7 +72,15 @@ export default function BrowseNotes() {
       params.append('limit', limit.toString());
       params.append('offset', ((page - 1) * limit).toString());
 
-      const response = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + `/api/notes?${params.toString()}`);
+      const token = localStorage.getItem('token');
+      const headers: any = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + `/api/notes?${params.toString()}`, {
+        headers
+      });
       if (response.ok) {
         const total = response.headers.get('X-Total-Count');
         if (total) setTotalCount(parseInt(total));

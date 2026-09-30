@@ -70,8 +70,28 @@ router.get('/', async (req, res) => {
     
     // Check cache if there are no specific search filters
     const isCacheable = !branch && !academic_year && !semester && !note_type && !search;
-    const cacheKey = `notes_feed_${limit}_${offset}`;
+    // cacheKey defined after auth extraction
     
+    let userCollegeId = null;
+    const authHeader = req.headers['authorization'];
+    if (authHeader) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userRes = await db.query('SELECT college_id FROM users WHERE id = $1', [decoded.userId]);
+        if (userRes.rows.length > 0) {
+          userCollegeId = userRes.rows[0].college_id;
+        }
+      } catch (e) {
+        console.error('Optional auth failed in notes feed:', e);
+      }
+    }
+
+    let cacheKey = `notes_feed_${limit}_${offset}`;
+    if (userCollegeId) {
+      cacheKey += `_col_${userCollegeId}`;
+    }
+
     if (isCacheable && redisClient.isReady) {
       const cached = await redisClient.get(cacheKey);
       if (cached) {
@@ -81,10 +101,18 @@ router.get('/', async (req, res) => {
         return res.json(rows);
       }
     }
+
+    let query = 'SELECT n.*, u.full_name as uploader_name FROM notes n JOIN users u ON n.uploader_id = u.id WHERE (UPPER(n.visibility) = UPPER($1)';
+    let params = ['PUBLIC'];
+    let paramCount = 2;
     
-    let query = 'SELECT n.*, u.full_name as uploader_name FROM notes n JOIN users u ON n.uploader_id = u.id WHERE UPPER(n.visibility) = UPPER($1) AND (n.status IS NULL OR UPPER(n.status) != UPPER($2)) AND n.deleted_at IS NULL';
-    let params = ['PUBLIC', 'hidden'];
-    let paramCount = 3;
+    if (userCollegeId) {
+      query += ` OR (UPPER(n.visibility) = 'COLLEGE_ONLY' AND u.college_id = $${paramCount++})`;
+      params.push(userCollegeId);
+    }
+    
+    query += `) AND (n.status IS NULL OR UPPER(n.status) != UPPER($${paramCount++})) AND n.deleted_at IS NULL`;
+    params.push('hidden');
     
     if (branch) { query += ` AND n.branch = $${paramCount++}`; params.push(branch); }
     if (academic_year) { query += ` AND n.academic_year = $${paramCount++}`; params.push(academic_year); }
